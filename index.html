@@ -1,0 +1,302 @@
+<!--
+BugLists Web — HTML/JS/CSS (no backend) for GitHub Pages
+Features:
+• Create/rename/delete lists
+• Add items with title + description
+• Auto timestamps (created & completed)
+• Move between Unsolved/Solved (and back)
+• LocalStorage persistence
+• Export/Import JSON (share or back up)
+
+Usage:
+1) Save this as index.html
+2) Commit to a GitHub repo and enable GitHub Pages (Settings ▸ Pages ▸ Deploy from branch)
+3) Open your site: https://<your-username>.github.io/<repo-name>/
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BugLists</title>
+  <meta name="color-scheme" content="dark light" />
+  <style>
+    :root{
+      --bg:#0b0f1a; --panel:#111827; --muted:#94a3b8; --ink:#e6f0ff; --accent:#3b82f6; --accent-2:#22c55e; --danger:#ef4444; --warn:#f59e0b;
+      --ring:rgba(59,130,246,.35);
+    }
+    @media (prefers-color-scheme: light){
+      :root{ --bg:#f6f7fb; --panel:#ffffff; --muted:#475569; --ink:#0b1220; }
+    }
+    html,body{height:100%}
+    body{margin:0; font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink); background:linear-gradient(180deg,var(--bg),#0a0e18 40%);}    
+    .app{display:grid; grid-template-columns: 280px 1fr; min-height:100vh}
+    aside{background:rgba(255,255,255,0.02); backdrop-filter: blur(6px); border-right:1px solid rgba(255,255,255,.06); padding:16px;}
+    main{padding:20px;}
+    h1{font-size:18px; letter-spacing:.3px; margin:0 0 12px 0; opacity:.9}
+    .row{display:flex; gap:8px}
+    input, textarea, select{background:var(--panel); border:1px solid rgba(255,255,255,.1); color:var(--ink); padding:10px 12px; border-radius:10px; outline:none; width:100%;}
+    input:focus, textarea:focus{box-shadow:0 0 0 3px var(--ring); border-color:var(--accent)}
+    button{appearance:none; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.04); color:var(--ink); padding:9px 12px; border-radius:10px; cursor:pointer}
+    button:hover{background:rgba(255,255,255,.08)}
+    .btn{display:inline-flex; align-items:center; gap:8px}
+    .btn.primary{background:var(--accent); border-color:transparent}
+    .btn.success{background:var(--accent-2); border-color:transparent}
+    .btn.danger{background:var(--danger); border-color:transparent}
+    .btn.warn{background:var(--warn); border-color:transparent}
+    .list-item{display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.02); margin-bottom:8px}
+    .list-item .name{font-weight:600}
+    .muted{color:var(--muted); font-size:12px}
+    .stack{display:flex; flex-direction:column; gap:10px}
+    .toolbar{display:flex; gap:8px; flex-wrap:wrap}
+    .columns{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:14px}
+    .card{background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:12px}
+    .item{border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px 12px; background:rgba(255,255,255,.02);}
+    .item + .item{margin-top:10px}
+    .item h4{margin:0 0 6px 0; font-size:15px}
+    .item .desc{white-space:pre-wrap; opacity:.9}
+    .section-title{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px}
+    .spacer{flex:1}
+    .hdr{display:flex; align-items:center; gap:10px; margin:0 0 12px 0}
+    .hdr h2{margin:0; font-size:20px}
+    .empty{padding:16px; text-align:center; border:1px dashed rgba(255,255,255,.2); border-radius:12px; color:var(--muted)}
+    .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.15); padding:1px 6px; border-radius:6px}
+    .footer{margin-top:16px; display:flex; gap:8px; flex-wrap:wrap}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <h1>BugLists</h1>
+      <div class="stack" id="lists"></div>
+      <div class="stack" style="margin-top:12px">
+        <div class="row">
+          <input id="newListName" placeholder="New list name" />
+          <button class="btn primary" id="addList">Add</button>
+        </div>
+      </div>
+      <div class="footer">
+        <button class="btn" id="exportBtn">Export JSON</button>
+        <label class="btn" for="importFile" style="cursor:pointer">Import JSON</label>
+        <input type="file" id="importFile" accept="application/json" hidden />
+      </div>
+    </aside>
+
+    <main>
+      <div class="hdr">
+        <h2 id="currentListTitle">Select a list</h2>
+        <span class="muted" id="currentListMeta"></span>
+        <span class="spacer"></span>
+        <button class="btn" id="renameListBtn" disabled>Rename</button>
+        <button class="btn danger" id="deleteListBtn" disabled>Delete</button>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <input id="newItemTitle" placeholder="Add new item (title)" />
+          <button class="btn primary" id="addItemBtn" disabled>Add</button>
+        </div>
+        <textarea id="newItemDesc" rows="3" placeholder="Description (optional)" style="margin-top:8px"></textarea>
+      </div>
+
+      <div class="columns">
+        <section class="card">
+          <div class="section-title"><strong>Unsolved</strong><span class="muted" id="openCount">0</span></div>
+          <div id="openItems"></div>
+        </section>
+        <section class="card">
+          <div class="section-title"><strong>Solved</strong><span class="muted" id="solvedCount">0</span></div>
+          <div id="solvedItems"></div>
+        </section>
+      </div>
+
+      <div id="emptyState" class="empty" style="display:none">No list selected. Create a list on the left, then add items here.</div>
+    </main>
+  </div>
+
+  <script>
+    // ---------- Storage & Utilities ----------
+    const STORE_KEY = 'buglists_v1';
+    const $ = sel => document.querySelector(sel);
+    const $$ = sel => Array.from(document.querySelectorAll(sel));
+    const nowIso = () => new Date().toISOString();
+    const fmt = (iso) => iso ? new Date(iso).toLocaleString() : '';
+    const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : 'id-' + Math.random().toString(36).slice(2));
+
+    const state = {
+      lists: [],
+      currentListId: null
+    };
+
+    function load(){
+      try{ const raw = localStorage.getItem(STORE_KEY); if(raw){ const obj = JSON.parse(raw); state.lists = obj.lists||[]; state.currentListId = obj.currentListId||null; } }
+      catch(e){ console.warn('Failed to load', e); }
+    }
+    function save(){ localStorage.setItem(STORE_KEY, JSON.stringify({lists:state.lists, currentListId:state.currentListId})); }
+
+    function getCurrent(){ return state.lists.find(l => l.id === state.currentListId) || null; }
+
+    // ---------- Rendering ----------
+    function render(){
+      renderSidebar();
+      renderMain();
+      save();
+    }
+
+    function renderSidebar(){
+      const wrap = $('#lists');
+      wrap.innerHTML = '';
+      state.lists.forEach(l => {
+        const div = document.createElement('div');
+        div.className = 'list-item';
+        div.innerHTML = `<span class="name">${escapeHtml(l.name)}</span><span class="muted">${l.items.filter(i=>!i.completedAt).length}/${l.items.length}</span>`;
+        div.onclick = () => { state.currentListId = l.id; render(); };
+        if(l.id === state.currentListId){ div.style.outline = '2px solid var(--accent)'; }
+        wrap.appendChild(div);
+      });
+    }
+
+    function renderMain(){
+      const list = getCurrent();
+      const disabled = !list;
+      $('#renameListBtn').disabled = disabled;
+      $('#deleteListBtn').disabled = disabled;
+      $('#addItemBtn').disabled = disabled;
+      $('#currentListTitle').textContent = list ? list.name : 'Select a list';
+      $('#currentListMeta').textContent = list ? `Created ${fmt(list.createdAt)}` : '';
+      $('#emptyState').style.display = list ? 'none' : 'block';
+      $('#openItems').innerHTML = '';
+      $('#solvedItems').innerHTML = '';
+      if(!list) return;
+
+      const open = list.items.filter(i => !i.completedAt);
+      const solved = list.items.filter(i => i.completedAt);
+      $('#openCount').textContent = open.length;
+      $('#solvedCount').textContent = solved.length;
+
+      open.forEach(item => $('#openItems').appendChild(renderItem(list, item)));
+      solved.forEach(item => $('#solvedItems').appendChild(renderItem(list, item)));
+    }
+
+    function renderItem(list, item){
+      const el = document.createElement('div');
+      el.className = 'item';
+      el.innerHTML = `
+        <h4>${escapeHtml(item.title)}</h4>
+        ${item.description ? `<div class="desc">${escapeHtml(item.description)}</div>` : ''}
+        <div class="muted">Created: ${fmt(item.createdAt)}${item.completedAt?` • Completed: ${fmt(item.completedAt)}`:''}</div>
+        <div class="toolbar" style="margin-top:8px">
+          <button class="btn ${item.completedAt?'warn':''}" data-action="toggle">${item.completedAt?'Mark Unsolved':'Mark Solved'}</button>
+          <button class="btn" data-action="edit">Edit</button>
+          <button class="btn danger" data-action="delete">Delete</button>
+        </div>`;
+
+      el.querySelector('[data-action="toggle"]').onclick = () => toggleItem(list.id, item.id);
+      el.querySelector('[data-action="edit"]').onclick = () => editItem(list.id, item.id);
+      el.querySelector('[data-action="delete"]').onclick = () => deleteItem(list.id, item.id);
+      return el;
+    }
+
+    function escapeHtml(str){
+      return String(str).replace(/[&<>"]\/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
+    }
+
+    // ---------- List actions ----------
+    $('#addList').onclick = () => {
+      const name = ($('#newListName').value || '').trim() || 'Untitled List';
+      const list = { id: uid(), name, createdAt: nowIso(), items: [] };
+      state.lists.unshift(list);
+      state.currentListId = list.id;
+      $('#newListName').value = '';
+      render();
+    };
+
+    $('#renameListBtn').onclick = () => {
+      const list = getCurrent(); if(!list) return;
+      const name = prompt('Rename list', list.name);
+      if(name && name.trim()){ list.name = name.trim(); list.updatedAt = nowIso(); render(); }
+    };
+
+    $('#deleteListBtn').onclick = () => {
+      const list = getCurrent(); if(!list) return;
+      if(confirm(`Delete list "${list.name}" and all its items?`)){
+        state.lists = state.lists.filter(l => l.id !== list.id);
+        state.currentListId = state.lists[0]?.id || null;
+        render();
+      }
+    };
+
+    // ---------- Item actions ----------
+    $('#addItemBtn').onclick = () => {
+      const list = getCurrent(); if(!list) return;
+      const title = ($('#newItemTitle').value||'').trim();
+      if(!title){ alert('Please enter a title'); return; }
+      const desc = ($('#newItemDesc').value||'').trim();
+      list.items.unshift({ id: uid(), title, description: desc||'', createdAt: nowIso(), completedAt: null });
+      $('#newItemTitle').value = '';
+      $('#newItemDesc').value = '';
+      render();
+    };
+
+    function toggleItem(listId, itemId){
+      const list = state.lists.find(l=>l.id===listId); if(!list) return;
+      const it = list.items.find(i=>i.id===itemId); if(!it) return;
+      if(it.completedAt){ it.completedAt = null; }
+      else { it.completedAt = nowIso(); }
+      render();
+    }
+
+    function editItem(listId, itemId){
+      const list = state.lists.find(l=>l.id===listId); if(!list) return;
+      const it = list.items.find(i=>i.id===itemId); if(!it) return;
+      const title = prompt('Edit title', it.title) ?? it.title;
+      const desc = prompt('Edit description (optional)', it.description || '') ?? it.description;
+      it.title = String(title).trim() || it.title;
+      it.description = String(desc).trim();
+      render();
+    }
+
+    function deleteItem(listId, itemId){
+      const list = state.lists.find(l=>l.id===listId); if(!list) return;
+      if(confirm('Delete this item?')){
+        list.items = list.items.filter(i=>i.id!==itemId);
+        render();
+      }
+    }
+
+    // ---------- Export / Import ----------
+    $('#exportBtn').onclick = () => {
+      const blob = new Blob([JSON.stringify({ lists: state.lists }, null, 2)], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `buglists-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+
+    $('#importFile').addEventListener('change', async (e) => {
+      const file = e.target.files[0]; if(!file) return;
+      try {
+        const txt = await file.text();
+        const data = JSON.parse(txt);
+        if(!data || !Array.isArray(data.lists)) throw new Error('Invalid file');
+        // Merge: imported lists are added; if same id exists, skip
+        const existingIds = new Set(state.lists.map(l=>l.id));
+        const toAdd = data.lists.filter(l=>!existingIds.has(l.id));
+        state.lists.push(...toAdd);
+        if(!state.currentListId && state.lists[0]) state.currentListId = state.lists[0].id;
+        render();
+      } catch(err){
+        alert('Import failed: ' + err.message);
+      } finally {
+        e.target.value = '';
+      }
+    });
+
+    // ---------- Init ----------
+    load();
+    if(!state.currentListId && state.lists[0]) state.currentListId = state.lists[0].id;
+    render();
+  </script>
+</body>
+</html>
