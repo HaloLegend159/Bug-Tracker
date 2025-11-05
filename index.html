@@ -1,65 +1,364 @@
 <!--
-BugLists Web — HTML/JS/CSS (no backend) for GitHub Pages
-Features:
-• Create/rename/delete lists
+BugLists Web — Polished HTML/JS for GitHub Pages (no backend)
+Theme: black / white / red with **Dark & Light** modes and a toggle (persisted).
+
+Features
+• Create / rename / delete lists
 • Add items with title + description
 • Auto timestamps (created & completed)
 • Move between Unsolved/Solved (and back)
 • LocalStorage persistence
-• Export/Import JSON (share or back up)
+• Export / Import JSON
 
-Usage:
-1) Save this as index.html
-2) Commit to a GitHub repo and enable GitHub Pages (Settings ▸ Pages ▸ Deploy from branch)
-3) Open your site: https://<your-username>.github.io/<repo-name>/
+How to use
+1) Save this file as **index.html** in a GitHub repo.
+2) Enable GitHub Pages (Settings ▸ Pages ▸ Deploy from branch).
+3) Open https://<your-username>.github.io/<repo>/
 -->
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>BugLists</title>
   <meta name="color-scheme" content="dark light" />
+  <title>BugLists</title>
   <style>
     :root{
-      --bg:#0b0f1a; --panel:#111827; --muted:#94a3b8; --ink:#e6f0ff; --accent:#3b82f6; --accent-2:#22c55e; --danger:#ef4444; --warn:#f59e0b;
-      --ring:rgba(59,130,246,.35);
+      /* Light theme (default) */
+      --bg:#ffffff;           /* white */
+      --panel:#f6f7fb;        /* soft light */
+      --ink:#0b0f14;          /* near black */
+      --muted:#6b7280;        /* gray */
+      --border:#e5e7eb;       /* light border */
+      --accent:#ef4444;       /* red */
+      --accent-ink:#ffffff;   /* text on red */
+      --accent-2:#111827;     /* deep black */
+      --shadow:0 6px 20px rgba(0,0,0,.08);
+      --ring:rgba(239,68,68,.35); /* red ring */
     }
-    @media (prefers-color-scheme: light){
-      :root{ --bg:#f6f7fb; --panel:#ffffff; --muted:#475569; --ink:#0b1220; }
+    [data-theme="dark"]{
+      /* Dark theme */
+      --bg:#0b0f14;           /* near black */
+      --panel:#0f1621;        /* dark panel */
+      --ink:#e8edf3;          /* near white */
+      --muted:#9aa3af;        /* gray */
+      --border:#1f2937;       /* dark border */
+      --accent:#ef4444;       /* red */
+      --accent-ink:#ffffff;   /* text on red */
+      --accent-2:#ffffff;     /* white */
+      --shadow:0 6px 24px rgba(0,0,0,.45);
+      --ring:rgba(239,68,68,.45);
     }
+
+    *{box-sizing:border-box}
     html,body{height:100%}
-    body{margin:0; font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink); background:linear-gradient(180deg,var(--bg),#0a0e18 40%);}    
-    .app{display:grid; grid-template-columns: 280px 1fr; min-height:100vh}
-    aside{background:rgba(255,255,255,0.02); backdrop-filter: blur(6px); border-right:1px solid rgba(255,255,255,.06); padding:16px;}
-    main{padding:20px;}
-    h1{font-size:18px; letter-spacing:.3px; margin:0 0 12px 0; opacity:.9}
-    .row{display:flex; gap:8px}
-    input, textarea, select{background:var(--panel); border:1px solid rgba(255,255,255,.1); color:var(--ink); padding:10px 12px; border-radius:10px; outline:none; width:100%;}
-    input:focus, textarea:focus{box-shadow:0 0 0 3px var(--ring); border-color:var(--accent)}
-    button{appearance:none; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.04); color:var(--ink); padding:9px 12px; border-radius:10px; cursor:pointer}
-    button:hover{background:rgba(255,255,255,.08)}
-    .btn{display:inline-flex; align-items:center; gap:8px}
-    .btn.primary{background:var(--accent); border-color:transparent}
-    .btn.success{background:var(--accent-2); border-color:transparent}
-    .btn.danger{background:var(--danger); border-color:transparent}
-    .btn.warn{background:var(--warn); border-color:transparent}
-    .list-item{display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.02); margin-bottom:8px}
-    .list-item .name{font-weight:600}
-    .muted{color:var(--muted); font-size:12px}
+    body{
+      margin:0; font: 15px/1.45 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink);
+      background:var(--bg);
+    }
+
+    .app{min-height:100vh; display:grid; grid-template-columns:300px 1fr}
+
+    aside{
+      border-right:1px solid var(--border);
+      background:var(--panel);
+      padding:18px;
+      position:sticky; top:0; height:100vh; overflow:auto;
+    }
+
+    header{
+      display:flex; align-items:center; gap:10px; justify-content:space-between; margin-bottom:14px;
+    }
+    .logo{display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:.2px}
+    .logo .dot{width:10px; height:10px; border-radius:50%; background:var(--accent)}
+
+    .theme-toggle{display:inline-flex; align-items:center; gap:8px; border:1px solid var(--border); background:transparent; padding:8px 10px; border-radius:10px; cursor:pointer}
+
     .stack{display:flex; flex-direction:column; gap:10px}
+    .row{display:flex; gap:8px}
+
+    input, textarea{width:100%; border:1px solid var(--border); background:#fff; color:#111; padding:10px 12px; border-radius:10px; outline:none}
+    [data-theme="dark"] input, [data-theme="dark"] textarea{background:#0b111a; color:var(--ink); border-color:#1e293b}
+    input:focus, textarea:focus{box-shadow:0 0 0 3px var(--ring); border-color:var(--accent)}
+
+    button{appearance:none; border:1px solid var(--border); background:transparent; color:var(--ink); padding:9px 12px; border-radius:10px; cursor:pointer}
+    button:hover{box-shadow:var(--shadow)}
+    .btn{display:inline-flex; align-items:center; gap:8px}
+    .btn.primary{background:var(--accent); color:var(--accent-ink); border-color:transparent}
+    .btn.black{background:var(--accent-2); color:#fff; border-color:transparent}
+    .btn.ghost{background:transparent}
+    .btn.danger{background:var(--accent); color:#fff; border-color:transparent}
+
+    .list-tile{display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.02)}
+    [data-theme="dark"] .list-tile{background:rgba(255,255,255,0.03)}
+    .list-tile.active{outline:2px solid var(--accent)}
+    .muted{color:var(--muted); font-size:12px}
+
+    main{padding:22px}
     .toolbar{display:flex; gap:8px; flex-wrap:wrap}
+
+    .panel{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px; box-shadow:var(--shadow)}
+
     .columns{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:14px}
-    .card{background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:12px}
-    .item{border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px 12px; background:rgba(255,255,255,.02);}
+
+    .section-title{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px}
+
+    .item{border:1px solid var(--border); border-radius:12px; padding:12px; background:#fff}
+    [data-theme="dark"] .item{background:#0b111a}
     .item + .item{margin-top:10px}
-    .item h4{margin:0 0 6px 0; font-size:15px}
-    .item .desc{white-space:pre-wrap; opacity:.9}
-    .section-title{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px}
-    .spacer{flex:1}
-    .hdr{display:flex; align-items:center; gap:10px; margin:0 0 12px 0}
-    .hdr h2{margin:0; font-size:20px}
-    .empty{padding:16px; text-align:center; border:1px dashed rgba(255,255,255,.2); border-radius:12px; color:var(--muted)}
+    .item h4{margin:0 0 6px 0; font-size:16px}
+    .desc{white-space:pre-wrap}
+
+    .empty{padding:18px; text-align:center; border:1px dashed var(--border); border-radius:12px; color:var(--muted)}
+
+    @media (max-width: 900px){
+      .app{grid-template-columns:1fr}
+      aside{position:static; height:auto}
+      .columns{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="root">
+    <aside>
+      <header>
+        <div class="logo"><span class="dot"></span> BugLists</div>
+        <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌓 <span id="themeLabel">Dark</span></button>
+      </header>
+
+      <div class="stack" id="lists"></div>
+
+      <div class="stack" style="margin-top:12px">
+        <div class="row">
+          <input id="newListName" placeholder="New list name" />
+          <button class="btn primary" id="addList">Add</button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px" class="row">
+        <button class="btn ghost" id="exportBtn">Export JSON</button>
+        <label class="btn ghost" for="importFile" style="cursor:pointer">Import JSON</label>
+        <input type="file" id="importFile" accept="application/json" hidden />
+      </div>
+    </aside>
+
+    <main>
+      <div class="panel">
+        <div class="toolbar" style="justify-content:space-between">
+          <div>
+            <h2 id="currentListTitle" style="margin:0">Select a list</h2>
+            <div class="muted" id="currentListMeta"></div>
+          </div>
+          <div class="toolbar">
+            <button class="btn" id="renameListBtn" disabled>Rename</button>
+            <button class="btn danger" id="deleteListBtn" disabled>Delete</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:12px">
+        <div class="row">
+          <input id="newItemTitle" placeholder="Add new item (title)" />
+          <button class="btn primary" id="addItemBtn" disabled>Add</button>
+        </div>
+        <textarea id="newItemDesc" rows="3" placeholder="Description (optional)" style="margin-top:8px"></textarea>
+      </div>
+
+      <div class="columns">
+        <section class="panel">
+          <div class="section-title"><strong>Unsolved</strong><span class="muted" id="openCount">0</span></div>
+          <div id="openItems"></div>
+        </section>
+        <section class="panel">
+          <div class="section-title"><strong>Solved</strong><span class="muted" id="solvedCount">0</span></div>
+          <div id="solvedItems"></div>
+        </section>
+      </div>
+
+      <div id="emptyState" class="empty" style="display:none">No list selected. Create a list on the left, then add items here.</div>
+    </main>
+  </div>
+
+  <script>
+    // --------- Helpers & persistent theme ---------
+    const STORE_KEY = 'buglists_v2';
+    const THEME_KEY = 'buglists_theme';
+    const $ = s => document.querySelector(s);
+    const nowIso = () => new Date().toISOString();
+    const fmt = (iso) => iso ? new Date(iso).toLocaleString() : '';
+    const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : 'id-' + Math.random().toString(36).slice(2));
+    const esc = (str) => String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
+
+    // Theme init
+    const rootEl = document.documentElement;
+    const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
+    setTheme(savedTheme);
+    $('#themeToggle').addEventListener('click', () => {
+      const next = rootEl.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      setTheme(next);
+    });
+    function setTheme(mode){
+      if(mode === 'dark'){ rootEl.setAttribute('data-theme','dark'); $('#themeLabel').textContent = 'Light'; }
+      else { rootEl.removeAttribute('data-theme'); $('#themeLabel').textContent = 'Dark'; }
+      localStorage.setItem(THEME_KEY, mode);
+    }
+
+    // --------- State & storage ---------
+    const state = { lists: [], currentListId: null };
+    function load(){
+      try{ const raw = localStorage.getItem(STORE_KEY); if(raw){ const o = JSON.parse(raw); state.lists = o.lists||[]; state.currentListId = o.currentListId||null; } }
+      catch(e){ console.warn('Failed to load', e); }
+    }
+    function save(){ localStorage.setItem(STORE_KEY, JSON.stringify({lists:state.lists, currentListId:state.currentListId})); }
+    function current(){ return state.lists.find(l=>l.id===state.currentListId)||null; }
+
+    // --------- Rendering ---------
+    function render(){ renderSidebar(); renderMain(); save(); }
+
+    function renderSidebar(){
+      const wrap = $('#lists'); wrap.innerHTML = '';
+      if(state.lists.length === 0){
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = 'No lists yet — create one!';
+        wrap.appendChild(empty);
+      }
+      state.lists.forEach(l => {
+        const div = document.createElement('div');
+        div.className = 'list-tile' + (l.id===state.currentListId?' active':'');
+        const open = l.items.filter(i=>!i.completedAt).length;
+        div.innerHTML = `<span style="font-weight:700">${esc(l.name)}</span><span class="muted">${open}/${l.items.length}</span>`;
+        div.addEventListener('click', ()=>{ state.currentListId = l.id; render(); });
+        wrap.appendChild(div);
+      });
+    }
+
+    function renderMain(){
+      const list = current();
+      const disabled = !list;
+      $('#renameListBtn').disabled = disabled;
+      $('#deleteListBtn').disabled = disabled;
+      $('#addItemBtn').disabled = disabled;
+      $('#currentListTitle').textContent = list ? list.name : 'Select a list';
+      $('#currentListMeta').textContent = list ? `Created ${fmt(list.createdAt)}` : '';
+      $('#emptyState').style.display = list ? 'none' : 'block';
+      $('#openItems').innerHTML=''; $('#solvedItems').innerHTML='';
+      if(!list) return;
+      const open = list.items.filter(i=>!i.completedAt);
+      const solved = list.items.filter(i=>i.completedAt);
+      $('#openCount').textContent = open.length; $('#solvedCount').textContent = solved.length;
+      open.forEach(it => $('#openItems').appendChild(renderItem(list, it)));
+      solved.forEach(it => $('#solvedItems').appendChild(renderItem(list, it)));
+    }
+
+    function renderItem(list, item){
+      const el = document.createElement('div');
+      el.className = 'item';
+      el.innerHTML = `
+        <h4>${esc(item.title)}</h4>
+        ${item.description?`<div class="desc">${esc(item.description)}</div>`:''}
+        <div class="muted">Created: ${fmt(item.createdAt)}${item.completedAt?` • Completed: ${fmt(item.completedAt)}`:''}</div>
+        <div class="toolbar" style="margin-top:8px">
+          <button class="btn ${item.completedAt?'black':'primary'}" data-act="toggle">${item.completedAt?'Mark Unsolved':'Mark Solved'}</button>
+          <button class="btn ghost" data-act="edit">Edit</button>
+          <button class="btn danger" data-act="delete">Delete</button>
+        </div>`;
+      el.querySelector('[data-act="toggle"]').onclick = ()=>toggleItem(list.id, item.id);
+      el.querySelector('[data-act="edit"]').onclick = ()=>editItem(list.id, item.id);
+      el.querySelector('[data-act="delete"]').onclick = ()=>deleteItem(list.id, item.id);
+      return el;
+    }
+
+    // --------- List actions ---------
+    $('#addList').onclick = () => {
+      const name = ($('#newListName').value||'').trim()||'Untitled List';
+      const list = { id:uid(), name, createdAt:nowIso(), items:[] };
+      state.lists.unshift(list);
+      state.currentListId = list.id;
+      $('#newListName').value='';
+      render();
+    };
+
+    $('#renameListBtn').onclick = () => {
+      const list = current(); if(!list) return;
+      const name = prompt('Rename list', list.name);
+      if(name && name.trim()){ list.name = name.trim(); render(); }
+    };
+
+    $('#deleteListBtn').onclick = () => {
+      const list = current(); if(!list) return;
+      if(confirm(`Delete list "${list.name}" and ALL its items?`)){
+        state.lists = state.lists.filter(l=>l.id!==list.id);
+        state.currentListId = state.lists[0]?.id || null;
+        render();
+      }
+    };
+
+    // --------- Item actions ---------
+    $('#addItemBtn').onclick = () => {
+      const list = current(); if(!list) return;
+      const title = ($('#newItemTitle').value||'').trim();
+      if(!title){ alert('Please enter a title'); return; }
+      const desc = ($('#newItemDesc').value||'').trim();
+      list.items.unshift({ id:uid(), title, description:desc, createdAt:nowIso(), completedAt:null });
+      $('#newItemTitle').value=''; $('#newItemDesc').value='';
+      render();
+    };
+
+    function toggleItem(listId, itemId){
+      const list = state.lists.find(l=>l.id===listId); if(!list) return;
+      const it = list.items.find(i=>i.id===itemId); if(!it) return;
+      it.completedAt = it.completedAt ? null : nowIso();
+      render();
+    }
+
+    function editItem(listId, itemId){
+      const list = state.lists.find(l=>l.id===listId); if(!list) return;
+      const it = list.items.find(i=>i.id===itemId); if(!it) return;
+      const newTitle = prompt('Edit title', it.title);
+      if(newTitle !== null){ it.title = newTitle.trim() || it.title; }
+      const newDesc = prompt('Edit description (optional)', it.description||'');
+      if(newDesc !== null){ it.description = newDesc.trim(); }
+      render();
+    }
+
+    function deleteItem(listId, itemId){
+      const list = state.lists.find(l=>l.id===listId); if(!list) return;
+      if(confirm('Delete this item?')){ list.items = list.items.filter(i=>i.id!==itemId); render(); }
+    }
+
+    // --------- Export / Import ---------
+    $('#exportBtn').onclick = () => {
+      const blob = new Blob([JSON.stringify({lists:state.lists}, null, 2)], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `buglists-${new Date().toISOString().slice(0,10)}.json`;
+      a.click(); URL.revokeObjectURL(a.href);
+    };
+
+    $('#importFile').addEventListener('change', async (e) => {
+      const file = e.target.files[0]; if(!file) return;
+      try {
+        const txt = await file.text();
+        const data = JSON.parse(txt);
+        if(!data || !Array.isArray(data.lists)) throw new Error('Invalid file');
+        // Merge — skip IDs we already have
+        const ids = new Set(state.lists.map(l=>l.id));
+        const incoming = data.lists.filter(l=>!ids.has(l.id));
+        state.lists.push(...incoming);
+        if(!state.currentListId && state.lists[0]) state.currentListId = state.lists[0].id;
+        render();
+      } catch(err){ alert('Import failed: ' + err.message); }
+      finally { e.target.value=''; }
+    });
+
+    // --------- Boot ---------
+    load();
+    if(!state.currentListId && state.lists[0]) state.currentListId = state.lists[0].id;
+    render();
+  </script>
+</body>
+</html>
     .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.15); padding:1px 6px; border-radius:6px}
     .footer{margin-top:16px; display:flex; gap:8px; flex-wrap:wrap}
   </style>
